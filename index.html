@@ -45,6 +45,13 @@
       console.log("Received: "+JSON.stringify(v));
      if(JSON.stringify(v).includes("pushed")) {
        counter.value++;
+      		if (state <= 3) {
+    		startTimer(setBreak, display);
+        state++;
+    } else {
+    		startTimer(bigBreak, display);
+        state = 0;
+    }
      }
     }
 
