@@ -1,99 +1,122 @@
 <html>
- <head>
-   <style>
-     body { margin:0;  }
-     #time { 
-      font-size: 240px;
-    }
-   </style>    
- </head>
- <body>
-  <input type="number" id="count" value=0 />
-  <span id="time">00:30</span>
-  <script src="https://www.puck-js.com/puck.js"></script>
-  <script type="text/javascript">
-    // Get the actual curve inside the SVG. You could make differemt
-    // parts of a more complex SVG do different things...
-    var counter = document.getElementById('count');
-   function startTimer(duration, display) {
-    var timer = duration, minutes, seconds;
-    clearInterval(interval);
-    interval = setInterval(function () {
-        minutes = parseInt(timer / 60, 10)
-        seconds = parseInt(timer % 60, 10);
 
-        minutes = minutes < 10 ? "0" + minutes : minutes;
-        seconds = seconds < 10 ? "0" + seconds : seconds;
+<head>
+    <style>
+        body {
+            margin: 0;
+        }
 
-        display.textContent = minutes + ":" + seconds;
+        #time {
+            font-size: 240px;
+        }
+    </style>
+</head>
 
-        if (--timer < 0) {
+<body>
+    <input type="number" id="sets" value=4 placeholder="Sets" />
+    <input type="number" id="transition" value=30 placeholder="Transition" />
+    <input type="number" id="break" value=90 placeholder="Break Time" />
+    <button id="bluetooth">connect</button>
+    <span id="time">00:30</span>
+    <script src="https://www.puck-js.com/puck.js"></script>
+    <script type="text/javascript">
+        // Get the actual curve inside the SVG. You could make differemt
+        // parts of a more complex SVG do different things...
+        var button = document.getElementById('bluetooth');
+
+        function startTimer(duration, display) {
+            var timer = duration,
+                minutes, seconds;
             clearInterval(interval);
+            interval = setInterval(function () {
+                minutes = parseInt(timer / 60, 10)
+                seconds = parseInt(timer % 60, 10);
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                display.textContent = minutes + ":" + seconds;
+
+                if (--timer < 0) {
+                    clearInterval(interval);
+                }
+            }, 1000);
         }
-    }, 1000);
-}
 
-    var setBreak = 30,
-    		bigBreak = 90,
-        sets = 4,
-        state = 0,
-        interval,
-        display = document.querySelector('#time');
-   var fixedSets = sets - 2;
+        var setBreak = 30,
+            bigBreak = 90,
+            sets = 4,
+            state = 0,
+            interval,
+            display = document.querySelector('#time');
+        var fixedSets = sets - 2;
+        document.getElementById('sets').onchange = function () {
+            sets = document.getElementById('sets').value;
+            fixedSets = sets - 2;
+        };
+        document.getElementById('transition').onchange = function () {
+            setBreak = document.getElementById('transition').value;
+        };
+        document.getElementById('break').onchange = function () {
+            bigBreak = document.getElementById('break').value;
+        };
 
-    // Called when we get a line of data - updates the light color
-    function onLine(v) {
-      console.log("Received: "+JSON.stringify(v));
-     if(JSON.stringify(v).includes("pushed")) {
-       counter.value++;
-      		if (state <= 3) {
-    		startTimer(setBreak, display);
-        state++;
-    } else {
-    		startTimer(bigBreak, display);
-        state = 0;
-    }
-     }
-    }
-
-    // When clicked, connect or disconnect
-    var connection;
-    counter.addEventListener("click", function() {
-      if (connection) {
-        connection.close();
-        connection = undefined;
-      }
-      Puck.connect(function(c) {
-        if (!c) {
-          alert("Couldn't connect!");
-          return;
+        // Called when we get a line of data - updates the light color
+        function onLine(v) {
+            console.log("Received: " + JSON.stringify(v));
+            if (JSON.stringify(v).includes("pushed")) {
+                if (state <= 3) {
+                    startTimer(setBreak, display);
+                    state++;
+                } else {
+                    startTimer(bigBreak, display);
+                    state = 0;
+                }
+            }
         }
-        connection = c;
-        // Handle the data we get back, and call 'onLine'
-        // whenever we get a line
-        var buf = "";
-        connection.on("data", function(d) {
-          buf += d;
-          var i = buf.indexOf("\n");
-          while (i>=0) {
-            onLine(buf.substr(0,i));
-            buf = buf.substr(i+1);
-            i = buf.indexOf("\n");
-          }
+
+        // When clicked, connect or disconnect
+        var connection;
+        button.addEventListener("click", function () {
+            if (connection) {
+                connection.close();
+                connection = undefined;
+            }
+            Puck.connect(function (c) {
+                if (!c) {
+                    alert("Couldn't connect!");
+                    return;
+                }
+                connection = c;
+                // Handle the data we get back, and call 'onLine'
+                // whenever we get a line
+                var buf = "";
+                connection.on("data", function (d) {
+                    buf += d;
+                    var i = buf.indexOf("\n");
+                    while (i >= 0) {
+                        onLine(buf.substr(0, i));
+                        buf = buf.substr(i + 1);
+                        i = buf.indexOf("\n");
+                    }
+                });
+                // First, reset Puck.js
+                connection.write("reset();\n", function () {
+                    // Wait for it to reset itself
+                    setTimeout(function () {
+                        // Now tell it to write data on the current light level to Bluetooth
+                        // 10 times a second. Also ensure that when disconnected, Puck.js
+                        // resets so the setInterval doesn't keep draining battery.
+                        connection.write(
+                            "setWatch(function(e){Bluetooth.println('pushed')},BTN,{edge:'falling',repeat:true,debounce:50});NRF.on('disconnect', function() {reset()});\n",
+                            function () {
+                                console.log("Ready...");
+                            });
+                    }, 1500);
+                });
+            });
         });
-        // First, reset Puck.js
-        connection.write("reset();\n", function() {
-          // Wait for it to reset itself
-          setTimeout(function() {
-            // Now tell it to write data on the current light level to Bluetooth
-            // 10 times a second. Also ensure that when disconnected, Puck.js
-            // resets so the setInterval doesn't keep draining battery.
-            connection.write("setWatch(function(e){Bluetooth.println('pushed')},BTN,{edge:'falling',repeat:true,debounce:50});NRF.on('disconnect', function() {reset()});\n",
-              function() { console.log("Ready..."); });
-          }, 1500);
-        });
-      });
-    });
-  </script>
- </body>
+    </script>
+</body>
+
 </html>
