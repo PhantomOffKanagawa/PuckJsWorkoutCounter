@@ -2,10 +2,9 @@
  <head>
    <style>
      body { margin:0;  }
-     svg {
-       display:block; position:absolute;
-       top:0%; left:0%; width:100%; height:100%;
-     }
+     #time { 
+      font-size: 240px;
+    }
    </style>    
  </head>
  <body>
@@ -36,9 +35,11 @@
 
     var setBreak = 30,
     		bigBreak = 90,
+        sets = 4,
         state = 0,
         interval,
         display = document.querySelector('#time');
+   var fixedSets = sets - 2;
 
     // Called when we get a line of data - updates the light color
     function onLine(v) {
